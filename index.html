@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Profit Penguin</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="https://www.svgrepo.com/show/475904/penguin.svg">
+    <link rel="apple-touch-icon" href="https://www.svgrepo.com/show/475904/penguin.svg">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --nav-bg: #1f2937; --nav-text: #e5e7eb; --nav-active-bg: #374151;
+            --nav-active-text: #ffffff; --content-bg: #f3f4f6; --card-bg: #ffffff;
+            --primary-text: #111827; --secondary-text: #6b7280; --accent-color: #3b82f6;
+            --success-color: #10b981; --danger-color: #ef4444; --warning-color: #f59e0b;
+        }
+        body { font-family: 'Poppins', sans-serif; margin: 0; background-color: var(--content-bg); color: var(--primary-text); padding-bottom: 80px; }
+        .content { padding: 20px; }
+        .page { display: none; }
+        .page.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); margin-bottom: 20px; }
+        h2, h3 { margin-top: 0; font-weight: 600; }
+        input, select, button { width: 100%; padding: 14px; margin: 8px 0; box-sizing: border-box; border-radius: 8px; border: 1px solid #d1d5db; font-size: 16px; font-family: 'Poppins', sans-serif; }
+        button { cursor: pointer; color: white; border: none; font-weight: 500; background-color: var(--accent-color); }
+        .btn-success { background-color: var(--success-color); }
+        .btn-danger { background-color: var(--danger-color); }
+        .btn-warning { background-color: var(--warning-color); }
+        .btn-small { padding: 6px 10px; font-size: 12px; margin: 0 4px 0 0; width: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border-bottom: 1px solid #e5e7eb; padding: 12px 8px; text-align: left; font-size: 14px; }
+        th { font-weight: 600; }
+        .actions-cell { width: 1%; white-space: nowrap; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background-color: var(--nav-bg); box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 1000; }
+        .nav-item { flex: 1; padding: 10px 0; text-align: center; color: var(--nav-text); cursor: pointer; font-size: 12px; }
+        .nav-item.icon { font-size: 24px; }
+        .nav-item.active { background-color: var(--nav-active-bg); color: var(--nav-active-text); }
+    </style>
+</head>
+<body>
+
+    <main class="content">
+        <div id="page-dashboard" class="page active">
+            <h2>🐧 Dashboard Principal</h2>
+            <div class="card">
+                <h3>Resumen Mensual</h3>
+                <p>Aquí veremos los gráficos y totales cuando tengamos datos cargados.</p>
+            </div>
+        </div>
+
+        <div id="page-gastos" class="page">
+            <h2>💸 Módulo de Gastos</h2>
+            <div class="card">
+                <h3>Cargar Total de Gasto Mensual</h3>
+                <form id="formGasto">
+                    <input type="month" id="gastoPeriodo" required>
+                    <select id="gastoCategoria" required><option value="">-- Seleccionar Categoría --</option></select>
+                    <input type="number" step="0.01" id="gastoMonto" placeholder="Monto Total del Mes (ARS)" required>
+                    <button type="submit" class="btn-success">Guardar Gasto</button>
+                </form>
+            </div>
+            <div class="card">
+                <h3>Historial de Gastos</h3>
+                <table><thead><tr><th>Período</th><th>Categoría</th><th>Monto</th><th>Acciones</th></tr></thead><tbody id="tablaGastos"></tbody></table>
+            </div>
+        </div>
+
+        <div id="page-ventas" class="page">
+            <h2>📈 Módulo de Ventas</h2>
+            <div class="card">
+                <h3>Cargar Total de Venta Mensual</h3>
+                <form id="formVenta">
+                    <input type="month" id="ventaPeriodo" required>
+                    <select id="ventaSubCategoria" required><option value="">-- Seleccionar Sub-Categoría --</option></select>
+                    <input type="number" step="0.01" id="ventaMonto" placeholder="Monto Total de Venta (ARS)" required>
+                    <input type="number" step="0.01" id="ventaRentabilidad" placeholder="Rentabilidad Promedio (%)" required>
+                    <button type="submit" class="btn-success">Guardar Venta</button>
+                </form>
+            </div>
+            <div class="card">
+                <h3>Historial de Ventas</h3>
+                <table><thead><tr><th>Período</th><th>Categoría</th><th>Monto</th><th>Rentab.</th><th>Acciones</th></tr></thead><tbody id="tablaVentas"></tbody></table>
+            </div>
+        </div>
+
+        <div id="page-configuracion" class="page">
+            <h2>⚙️ Módulo de Configuración</h2>
+            <div class="card">
+                <h3>Categorías de Gasto</h3>
+                <form id="formCategoriaGasto"><input type="text" id="categoriaGastoNombre" placeholder="Ej: Sueldos" required><button type="submit">Agregar</button></form>
+                <table><thead><tr><th>Nombre</th><th>Acciones</th></tr></thead><tbody id="tablaCategoriasGasto"></tbody></table>
+            </div>
+            <div class="card">
+                <h3>Sub-Categorías de Venta</h3>
+                <form id="formSubCategoriaVenta">
+                    <input type="text" id="subCategoriaVentaNombre" placeholder="Ej: Ventas Retail" required>
+                    <select id="subCategoriaVentaPadre" required><option value="">-- Asignar a Vertical --</option></select>
+                    <button type="submit">Agregar</button>
+                </form>
+                <table><thead><tr><th>Nombre</th><th>Vertical Padre</th><th>Acciones</th></tr></thead><tbody id="tablaSubCategoriasVenta"></tbody></table>
+            </div>
+            <div class="card">
+                <h3>Verticales de Negocio</h3>
+                <p>Estas son las áreas principales de tu empresa. Se gestionan directamente en el código por ahora.</p>
+                <table><thead><tr><th>Nombre</th></tr></thead><tbody id="tablaVerticales"></tbody></table>
+            </div>
+        </div>
+    </main>
+
+    <nav class="bottom-nav">
+        <div class="nav-item active" data-page="dashboard"><div class="icon">📊</div><div>Dashboard</div></div>
+        <div class="nav-item" data-page="gastos"><div class="icon">💸</div><div>Gastos</div></div>
+        <div class="nav-item" data-page="ventas"><div class="icon">📈</div><div>Ventas</div></div>
+        <div class="nav-item" data-page="configuracion"><div class="icon">⚙️</div><div>Config.</div></div>
+    </nav>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- STATE & DB ---
+    let categoriasGasto = JSON.parse(localStorage.getItem('profit_categoriasGasto')) || [
+        { id: 1, nombre: 'Alquiler' }, { id: 2, nombre: 'Sueldos' }, { id: 3, nombre: 'Impuestos' }
+    ];
+    let verticales = JSON.parse(localStorage.getItem('profit_verticales')) || [
+        { id: 1, nombre: 'Penguin Coffee' }, { id: 2, nombre: 'Blendo' }, { id: 3, nombre: 'Penguin Academia' }, { id: 4, nombre: 'Maitei' }
+    ];
+    let subCategoriasVenta = JSON.parse(localStorage.getItem('profit_subCategoriasVenta')) || [
+        { id: 1, nombre: 'Ventas Retail', verticalId: 1 }, { id: 2, nombre: 'Ventas Mayoristas', verticalId: 1 }, { id: 3, nombre: 'Venta de Syrups', verticalId: 2 }
+    ];
+    let gastos = JSON.parse(localStorage.getItem('profit_gastos')) || [];
+    let ventas = JSON.parse(localStorage.getItem('profit_ventas')) || [];
+
+    const saveData = () => {
+        localStorage.setItem('profit_categoriasGasto', JSON.stringify(categoriasGasto));
+        localStorage.setItem('profit_verticales', JSON.stringify(verticales));
+        localStorage.setItem('profit_subCategoriasVenta', JSON.stringify(subCategoriasVenta));
+        localStorage.setItem('profit_gastos', JSON.stringify(gastos));
+        localStorage.setItem('profit_ventas', JSON.stringify(ventas));
+    };
+
+    // --- NAVIGATION ---
+    const navItems = document.querySelectorAll('.nav-item');
+    const pages = document.querySelectorAll('.page');
+    const showPage = (pageId) => {
+        pages.forEach(p => p.classList.remove('active'));
+        document.getElementById(`page-${pageId}`).classList.add('active');
+        navItems.forEach(n => n.classList.remove('active'));
+        document.querySelector(`.nav-item[data-page="${pageId}"]`).classList.add('active');
+    };
+    navItems.forEach(item => item.addEventListener('click', () => showPage(item.dataset.page)));
+
+    // --- UI RENDERING ---
+    const renderUI = () => {
+        // Render Configuración
+        const tablaCategoriasGasto = document.getElementById('tablaCategoriasGasto');
+        tablaCategoriasGasto.innerHTML = '';
+        categoriasGasto.forEach((cat, i) => {
+            tablaCategoriasGasto.innerHTML += `<tr><td>${cat.nombre}</td><td class="actions-cell"><button class="btn-small btn-danger" onclick="deleteItem('catGasto', ${i})">X</button></td></tr>`;
+        });
+
+        const tablaVerticales = document.getElementById('tablaVerticales');
+        tablaVerticales.innerHTML = '';
+        verticales.forEach(v => {
+            tablaVerticales.innerHTML += `<tr><td>${v.nombre}</td></tr>`;
+        });
+
+        const tablaSubCategoriasVenta = document.getElementById('tablaSubCategoriasVenta');
+        const subCategoriaVentaPadreSelect = document.getElementById('subCategoriaVentaPadre');
+        tablaSubCategoriasVenta.innerHTML = '';
+        subCategoriaVentaPadreSelect.innerHTML = '<option value="">-- Asignar a Vertical --</option>';
+        verticales.forEach(v => subCategoriaVentaPadreSelect.add(new Option(v.nombre, v.id)));
+        subCategoriasVenta.forEach((sub, i) => {
+            const verticalPadre = verticales.find(v => v.id == sub.verticalId);
+            tablaSubCategoriasVenta.innerHTML += `<tr><td>${sub.nombre}</td><td>${verticalPadre?.nombre || 'N/A'}</td><td class="actions-cell"><button class="btn-small btn-danger" onclick="deleteItem('subCatVenta', ${i})">X</button></td></tr>`;
+        });
+
+        // Render Gastos
+        const gastoCategoriaSelect = document.getElementById('gastoCategoria');
+        gastoCategoriaSelect.innerHTML = '<option value="">-- Seleccionar Categoría --</option>';
+        categoriasGasto.forEach(cat => gastoCategoriaSelect.add(new Option(cat.nombre, cat.id)));
+        
+        const tablaGastos = document.getElementById('tablaGastos');
+        tablaGastos.innerHTML = '';
+        gastos.sort((a,b) => b.periodo.localeCompare(a.periodo)).forEach((gasto, i) => {
+            const categoria = categoriasGasto.find(c => c.id == gasto.categoriaId);
+            tablaGastos.innerHTML += `<tr><td>${gasto.periodo}</td><td>${categoria?.nombre || 'N/A'}</td><td>$${gasto.monto.toLocaleString('es-AR')}</td><td class="actions-cell"><button class="btn-small btn-danger" onclick="deleteItem('gasto', ${i})">X</button></td></tr>`;
+        });
+
+        // Render Ventas
+        const ventaSubCategoriaSelect = document.getElementById('ventaSubCategoria');
+        ventaSubCategoriaSelect.innerHTML = '<option value="">-- Seleccionar Sub-Categoría --</option>';
+        subCategoriasVenta.forEach(sub => ventaSubCategoriaSelect.add(new Option(sub.nombre, sub.id)));
+
+        const tablaVentas = document.getElementById('tablaVentas');
+        tablaVentas.innerHTML = '';
+        ventas.sort((a,b) => b.periodo.localeCompare(a.periodo)).forEach((venta, i) => {
+            const subCategoria = subCategoriasVenta.find(s => s.id == venta.subCategoriaId);
+            tablaVentas.innerHTML += `<tr><td>${venta.periodo}</td><td>${subCategoria?.nombre || 'N/A'}</td><td>$${venta.monto.toLocaleString('es-AR')}</td><td>${venta.rentabilidad}%</td><td class="actions-cell"><button class="btn-small btn-danger" onclick="deleteItem('venta', ${i})">X</button></td></tr>`;
+        });
+    };
+
+    // --- FORM HANDLERS ---
+    document.getElementById('formCategoriaGasto').addEventListener('submit', e => {
+        e.preventDefault();
+        const nombre = document.getElementById('categoriaGastoNombre').value;
+        categoriasGasto.push({ id: Date.now(), nombre });
+        saveData(); renderUI(); e.target.reset();
+    });
+
+    document.getElementById('formSubCategoriaVenta').addEventListener('submit', e => {
+        e.preventDefault();
+        const nombre = document.getElementById('subCategoriaVentaNombre').value;
+        const verticalId = document.getElementById('subCategoriaVentaPadre').value;
+        subCategoriasVenta.push({ id: Date.now(), nombre, verticalId });
+        saveData(); renderUI(); e.target.reset();
+    });
+    
+    document.getElementById('formGasto').addEventListener('submit', e => {
+        e.preventDefault();
+        const periodo = document.getElementById('gastoPeriodo').value;
+        const categoriaId = document.getElementById('gastoCategoria').value;
+        const monto = parseFloat(document.getElementById('gastoMonto').value);
+        gastos.push({ id: Date.now(), periodo, categoriaId, monto });
+        saveData(); renderUI(); e.target.reset();
+    });
+
+    document.getElementById('formVenta').addEventListener('submit', e => {
+        e.preventDefault();
+        const periodo = document.getElementById('ventaPeriodo').value;
+        const subCategoriaId = document.getElementById('ventaSubCategoria').value;
+        const monto = parseFloat(document.getElementById('ventaMonto').value);
+        const rentabilidad = parseFloat(document.getElementById('ventaRentabilidad').value);
+        ventas.push({ id: Date.now(), periodo, subCategoriaId, monto, rentabilidad });
+        saveData(); renderUI(); e.target.reset();
+    });
+    
+    // --- DELETE LOGIC ---
+    window.deleteItem = (type, index) => {
+        const confirmMsg = '¿Estás seguro de que quieres eliminar este elemento?';
+        let collection;
+        switch(type) {
+            case 'catGasto': collection = categoriasGasto; break;
+            case 'subCatVenta': collection = subCategoriasVenta; break;
+            case 'gasto': collection = gastos; break;
+            case 'venta': collection = ventas; break;
+            default: return;
+        }
+
+        if (confirm(confirmMsg)) {
+            collection.splice(index, 1);
+            saveData();
+            renderUI();
+        }
+    };
+
+    // --- INITIALIZATION ---
+    renderUI();
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    document.getElementById('gastoPeriodo').value = currentMonth;
+    document.getElementById('ventaPeriodo').value = currentMonth;
+});
+</script>
+
+</body>
+</html>

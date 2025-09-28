@@ -14,6 +14,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --nav-bg: #1f2937; --nav-text: #e5e7eb; --nav-active-bg: #374151;
@@ -42,6 +43,12 @@
         .nav-item { flex: 1; padding: 10px 0; text-align: center; color: var(--nav-text); cursor: pointer; font-size: 12px; }
         .nav-item.icon { font-size: 24px; }
         .nav-item.active { background-color: var(--nav-active-bg); color: var(--nav-active-text); }
+        /* Estilos para el Dashboard */
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center; }
+        .summary-card { background-color: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .summary-card .value { font-size: 24px; font-weight: 600; color: var(--accent-color); margin-top: 5px; }
+        .summary-card .value.profit { color: var(--success-color); }
+        .summary-card .value.loss { color: var(--danger-color); }
     </style>
 </head>
 <body>
@@ -50,8 +57,34 @@
         <div id="page-dashboard" class="page active">
             <h2>🐧 Dashboard Principal</h2>
             <div class="card">
-                <h3>Resumen Mensual</h3>
-                <p>Aquí veremos los gráficos y totales cuando tengamos datos cargados.</p>
+                <h3>Seleccionar Período</h3>
+                <input type="month" id="dashboardPeriodo">
+            </div>
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div>Ingresos Totales</div>
+                    <div id="totalIngresos" class="value">$0</div>
+                </div>
+                <div class="summary-card">
+                    <div>Gastos Totales</div>
+                    <div id="totalGastos" class="value">$0</div>
+                </div>
+                <div class="summary-card">
+                    <div>Beneficio Neto</div>
+                    <div id="beneficioNeto" class="value">$0</div>
+                </div>
+                <div class="summary-card">
+                    <div>Rentabilidad Prom.</div>
+                    <div id="rentabilidadPromedio" class="value">0%</div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Composición de Ingresos</h3>
+                <canvas id="ingresosChart"></canvas>
+            </div>
+            <div class="card">
+                <h3>Composición de Gastos</h3>
+                <canvas id="gastosChart"></canvas>
             </div>
         </div>
 
@@ -135,6 +168,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     let gastos = JSON.parse(localStorage.getItem('profit_gastos')) || [];
     let ventas = JSON.parse(localStorage.getItem('profit_ventas')) || [];
+    
+    let ingresosChartInstance = null;
+    let gastosChartInstance = null;
 
     const saveData = () => {
         localStorage.setItem('profit_categoriasGasto', JSON.stringify(categoriasGasto));
@@ -154,6 +190,101 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector(`.nav-item[data-page="${pageId}"]`).classList.add('active');
     };
     navItems.forEach(item => item.addEventListener('click', () => showPage(item.dataset.page)));
+
+    // --- HELPERS ---
+    const formatCurrency = (number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(number);
+    const formatPeriodo = (periodo) => {
+        const [year, month] = periodo.split('-');
+        return `${month}/${year}`;
+    }
+
+    // --- DASHBOARD LOGIC ---
+    const updateDashboard = (periodo) => {
+        const ventasDelPeriodo = ventas.filter(v => v.periodo === periodo);
+        const gastosDelPeriodo = gastos.filter(g => g.periodo === periodo);
+
+        // Calculate summaries
+        const totalIngresos = ventasDelPeriodo.reduce((sum, v) => sum + v.monto, 0);
+        const totalGastos = gastosDelPeriodo.reduce((sum, g) => sum + g.monto, 0);
+        const beneficioNeto = totalIngresos - totalGastos;
+        
+        const totalPonderadoRentabilidad = ventasDelPeriodo.reduce((sum, v) => sum + (v.monto * v.rentabilidad), 0);
+        const rentabilidadPromedio = totalIngresos > 0 ? totalPonderadoRentabilidad / totalIngresos : 0;
+
+        // Update summary cards
+        document.getElementById('totalIngresos').textContent = formatCurrency(totalIngresos);
+        document.getElementById('totalGastos').textContent = formatCurrency(totalGastos);
+        const beneficioNetoEl = document.getElementById('beneficioNeto');
+        beneficioNetoEl.textContent = formatCurrency(beneficioNeto);
+        beneficioNetoEl.className = 'value ' + (beneficioNeto >= 0 ? 'profit' : 'loss');
+        document.getElementById('rentabilidadPromedio').textContent = `${rentabilidadPromedio.toFixed(2)}%`;
+
+        // Prepare data for Ingresos Chart (by Vertical)
+        const ingresosPorVertical = ventasDelPeriodo.reduce((acc, venta) => {
+            const subCat = subCategoriasVenta.find(s => s.id == venta.subCategoriaId);
+            const vertical = subCat ? verticales.find(v => v.id == subCat.verticalId) : null;
+            if (vertical) {
+                acc[vertical.nombre] = (acc[vertical.nombre] || 0) + venta.monto;
+            }
+            return acc;
+        }, {});
+        
+        // Prepare data for Gastos Chart (by Categoria)
+        const gastosPorCategoria = gastosDelPeriodo.reduce((acc, gasto) => {
+            const categoria = categoriasGasto.find(c => c.id == gasto.categoriaId);
+            if (categoria) {
+                acc[categoria.nombre] = (acc[categoria.nombre] || 0) + gasto.monto;
+            }
+            return acc;
+        }, {});
+
+        // Render charts
+        renderPieChart('ingresosChart', 'ingresosChartInstance', Object.keys(ingresosPorVertical), Object.values(ingresosPorVertical), 'Ingresos por Vertical');
+        renderPieChart('gastosChart', 'gastosChartInstance', Object.keys(gastosPorCategoria), Object.values(gastosPorCategoria), 'Gastos por Categoría');
+    };
+
+    const renderPieChart = (canvasId, instanceVar, labels, data, title) => {
+        if (window[instanceVar]) {
+            window[instanceVar].destroy();
+        }
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        window[instanceVar] = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels.length > 0 ? labels : ['Sin datos'],
+                datasets: [{
+                    label: title,
+                    data: data.length > 0 ? data : [1],
+                    backgroundColor: [
+                        '#3b82f6', '#10b981', '#ef4444', '#f59e0b',
+                        '#6366f1', '#8b5cf6', '#ec4899', '#6b7280'
+                    ],
+                    borderColor: '#ffffff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed !== null) {
+                                    label += formatCurrency(context.parsed);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    document.getElementById('dashboardPeriodo').addEventListener('change', (e) => updateDashboard(e.target.value));
 
     // --- UI RENDERING ---
     const renderUI = () => {
@@ -189,7 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tablaGastos.innerHTML = '';
         gastos.sort((a,b) => b.periodo.localeCompare(a.periodo)).forEach((gasto, i) => {
             const categoria = categoriasGasto.find(c => c.id == gasto.categoriaId);
-            tablaGastos.innerHTML += `<tr><td>${gasto.periodo}</td><td>${categoria?.nombre || 'N/A'}</td><td>$${gasto.monto.toLocaleString('es-AR')}</td><td class="actions-cell"><button class="btn-small btn-danger" onclick="deleteItem('gasto', ${i})">X</button></td></tr>`;
+            tablaGastos.innerHTML += `<tr><td>${formatPeriodo(gasto.periodo)}</td><td>${categoria?.nombre || 'N/A'}</td><td>${formatCurrency(gasto.monto)}</td><td class="actions-cell"><button class="btn-small btn-danger" onclick="deleteItem('gasto', ${i})">X</button></td></tr>`;
         });
 
         // Render Ventas
@@ -201,48 +332,22 @@ document.addEventListener('DOMContentLoaded', () => {
         tablaVentas.innerHTML = '';
         ventas.sort((a,b) => b.periodo.localeCompare(a.periodo)).forEach((venta, i) => {
             const subCategoria = subCategoriasVenta.find(s => s.id == venta.subCategoriaId);
-            tablaVentas.innerHTML += `<tr><td>${venta.periodo}</td><td>${subCategoria?.nombre || 'N/A'}</td><td>$${venta.monto.toLocaleString('es-AR')}</td><td>${venta.rentabilidad}%</td><td class="actions-cell"><button class="btn-small btn-danger" onclick="deleteItem('venta', ${i})">X</button></td></tr>`;
+            tablaVentas.innerHTML += `<tr><td>${formatPeriodo(venta.periodo)}</td><td>${subCategoria?.nombre || 'N/A'}</td><td>${formatCurrency(venta.monto)}</td><td>${venta.rentabilidad}%</td><td class="actions-cell"><button class="btn-small btn-danger" onclick="deleteItem('venta', ${i})">X</button></td></tr>`;
         });
+        
+        // Update dashboard with current period
+        updateDashboard(document.getElementById('dashboardPeriodo').value);
     };
 
     // --- FORM HANDLERS ---
-    document.getElementById('formCategoriaGasto').addEventListener('submit', e => {
-        e.preventDefault();
-        const nombre = document.getElementById('categoriaGastoNombre').value;
-        categoriasGasto.push({ id: Date.now(), nombre });
-        saveData(); renderUI(); e.target.reset();
-    });
-
-    document.getElementById('formSubCategoriaVenta').addEventListener('submit', e => {
-        e.preventDefault();
-        const nombre = document.getElementById('subCategoriaVentaNombre').value;
-        const verticalId = document.getElementById('subCategoriaVentaPadre').value;
-        subCategoriasVenta.push({ id: Date.now(), nombre, verticalId });
-        saveData(); renderUI(); e.target.reset();
-    });
-    
-    document.getElementById('formGasto').addEventListener('submit', e => {
-        e.preventDefault();
-        const periodo = document.getElementById('gastoPeriodo').value;
-        const categoriaId = document.getElementById('gastoCategoria').value;
-        const monto = parseFloat(document.getElementById('gastoMonto').value);
-        gastos.push({ id: Date.now(), periodo, categoriaId, monto });
-        saveData(); renderUI(); e.target.reset();
-    });
-
-    document.getElementById('formVenta').addEventListener('submit', e => {
-        e.preventDefault();
-        const periodo = document.getElementById('ventaPeriodo').value;
-        const subCategoriaId = document.getElementById('ventaSubCategoria').value;
-        const monto = parseFloat(document.getElementById('ventaMonto').value);
-        const rentabilidad = parseFloat(document.getElementById('ventaRentabilidad').value);
-        ventas.push({ id: Date.now(), periodo, subCategoriaId, monto, rentabilidad });
-        saveData(); renderUI(); e.target.reset();
-    });
+    document.getElementById('formCategoriaGasto').addEventListener('submit', e => { e.preventDefault(); const nombre = document.getElementById('categoriaGastoNombre').value; categoriasGasto.push({ id: Date.now(), nombre }); saveData(); renderUI(); e.target.reset(); });
+    document.getElementById('formSubCategoriaVenta').addEventListener('submit', e => { e.preventDefault(); const nombre = document.getElementById('subCategoriaVentaNombre').value; const verticalId = document.getElementById('subCategoriaVentaPadre').value; subCategoriasVenta.push({ id: Date.now(), nombre, verticalId }); saveData(); renderUI(); e.target.reset(); });
+    document.getElementById('formGasto').addEventListener('submit', e => { e.preventDefault(); const periodo = document.getElementById('gastoPeriodo').value; const categoriaId = document.getElementById('gastoCategoria').value; const monto = parseFloat(document.getElementById('gastoMonto').value); gastos.push({ id: Date.now(), periodo, categoriaId, monto }); saveData(); renderUI(); e.target.reset(); });
+    document.getElementById('formVenta').addEventListener('submit', e => { e.preventDefault(); const periodo = document.getElementById('ventaPeriodo').value; const subCategoriaId = document.getElementById('ventaSubCategoria').value; const monto = parseFloat(document.getElementById('ventaMonto').value); const rentabilidad = parseFloat(document.getElementById('ventaRentabilidad').value); ventas.push({ id: Date.now(), periodo, subCategoriaId, monto, rentabilidad }); saveData(); renderUI(); e.target.reset(); });
     
     // --- DELETE LOGIC ---
     window.deleteItem = (type, index) => {
-        const confirmMsg = '¿Estás seguro de que quieres eliminar este elemento?';
+        const confirmMsg = '¿Estás seguro?';
         let collection;
         switch(type) {
             case 'catGasto': collection = categoriasGasto; break;
@@ -251,19 +356,15 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'venta': collection = ventas; break;
             default: return;
         }
-
-        if (confirm(confirmMsg)) {
-            collection.splice(index, 1);
-            saveData();
-            renderUI();
-        }
+        if (confirm(confirmMsg)) { collection.splice(index, 1); saveData(); renderUI(); }
     };
 
     // --- INITIALIZATION ---
-    renderUI();
     const currentMonth = new Date().toISOString().slice(0, 7);
+    document.getElementById('dashboardPeriodo').value = currentMonth;
     document.getElementById('gastoPeriodo').value = currentMonth;
     document.getElementById('ventaPeriodo').value = currentMonth;
+    renderUI();
 });
 </script>
 

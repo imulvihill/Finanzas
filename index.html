@@ -203,13 +203,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const ventasDelPeriodo = ventas.filter(v => v.periodo === periodo);
         const gastosDelPeriodo = gastos.filter(g => g.periodo === periodo);
 
-        // Calculate summaries
+        // --- CÁLCULOS CORREGIDOS ---
         const totalIngresos = ventasDelPeriodo.reduce((sum, v) => sum + v.monto, 0);
         const totalGastos = gastosDelPeriodo.reduce((sum, g) => sum + g.monto, 0);
-        const beneficioNeto = totalIngresos - totalGastos;
         
-        const totalPonderadoRentabilidad = ventasDelPeriodo.reduce((sum, v) => sum + (v.monto * v.rentabilidad), 0);
-        const rentabilidadPromedio = totalIngresos > 0 ? totalPonderadoRentabilidad / totalIngresos : 0;
+        // 1. Calcular la ganancia bruta total de las ventas usando la rentabilidad de cada una.
+        const gananciaBrutaDeVentas = ventasDelPeriodo.reduce((sum, v) => {
+            const ganancia = v.monto * (v.rentabilidad / 100);
+            return sum + ganancia;
+        }, 0);
+        
+        // 2. El Beneficio Neto es la Ganancia Bruta menos los Gastos Totales.
+        const beneficioNeto = gananciaBrutaDeVentas - totalGastos;
+        
+        const rentabilidadPromedio = totalIngresos > 0 ? (gananciaBrutaDeVentas / totalIngresos) * 100 : 0;
 
         // Update summary cards
         document.getElementById('totalIngresos').textContent = formatCurrency(totalIngresos);
